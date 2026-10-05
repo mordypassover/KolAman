@@ -54,14 +54,20 @@ namespace CsFileSystemWatcher.Services
                     Console.WriteLine();
 
                     var mesegeString = File.ReadAllText(string.Join("\\", filePath));
-
-                    var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
-                    if (rawMesege == null)
+                    try
                     {
-                        return;
-                    }
+                        var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
+                        if (rawMesege == null)
+                        {
+                            return;
+                        }
 
-                    _producer.Produce("raw-data", rawMesege);
+                        _producer.Produce("raw-data", rawMesege);
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine(ex);
+                    }
                 }
 
                 return;
@@ -78,14 +84,20 @@ namespace CsFileSystemWatcher.Services
                 
 
                 var mesegeString = File.ReadAllText(string.Join("\\", filePath));
-                var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
-                Console.WriteLine(rawMesege.AlertId);
-                if (rawMesege == null)
+                try
                 {
-                    return;
-                }
+                    var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
+                    if (rawMesege == null)
+                    {
+                        return;
+                    }
 
-                _producer.Produce("raw-data", rawMesege);
+                    _producer.Produce("raw-data", rawMesege);
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine(ex);
+                }
             }
 
             string value = $"Created: {e.FullPath}";
