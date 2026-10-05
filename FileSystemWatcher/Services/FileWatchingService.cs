@@ -1,13 +1,24 @@
-﻿using System;
+﻿using CsFileSystemWatcher.Models;
+using System;
 using System.IO;
+using System.Text.Json;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace CsFileSystemWatcher.Services
 {
-    internal class FileWatchingService
+    class FileWatchingService
     {
+        private readonly KafkaService _producer;
+
+        public FileWatchingService(KafkaService producer)
+        {
+            _producer = producer;
+        }
         public void Watch()
         {
             using var watcher = new FileSystemWatcher(@".\..\alert-simulator\alerts");
+
+            
 
             watcher.NotifyFilter = NotifyFilters.Attributes
                                  | NotifyFilters.CreationTime
@@ -32,17 +43,51 @@ namespace CsFileSystemWatcher.Services
             Console.ReadLine();
         }
 
-        private static void OnChanged(object sender, FileSystemEventArgs e)
+        private void OnChanged(object sender, FileSystemEventArgs e)
         {
             if (e.ChangeType != WatcherChangeTypes.Changed)
             {
+                if (e.FullPath.Split('\\').Last() == "alert.ready")
+                {
+                    var filePath = e.FullPath.Split('\\');
+                    filePath[filePath.Length-1] = "alert.json";
+                    Console.WriteLine();
+
+                    var mesegeString = File.ReadAllText(string.Join("\\", filePath));
+
+                    var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
+                    if (rawMesege == null)
+                    {
+                        return;
+                    }
+
+                    _producer.Produce("raw-data", rawMesege);
+                }
+
                 return;
             }
             Console.WriteLine($"Changed: {e.FullPath}");
         }
 
-        private static void OnCreated(object sender, FileSystemEventArgs e)
+        private void OnCreated(object sender, FileSystemEventArgs e)
         {
+            if (e.FullPath.Split('\\').Last() == "alert.ready")
+            {
+                var filePath = e.FullPath.Split('\\');
+                filePath[filePath.Length-1] = "alert.json";
+                
+
+                var mesegeString = File.ReadAllText(string.Join("\\", filePath));
+                var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
+                Console.WriteLine(rawMesege.AlertId);
+                if (rawMesege == null)
+                {
+                    return;
+                }
+
+                _producer.Produce("raw-data", rawMesege);
+            }
+
             string value = $"Created: {e.FullPath}";
             Console.WriteLine(value);
         }
