@@ -1,8 +1,14 @@
 import json
 import redis
-
-
+import geopandas as gpd
+from shapely.geometry import Point
+import asyncio
+from rstream import Producer
 from confluent_kafka import Consumer
+
+# 5GB
+STREAM_RETENTION = 5000000000
+
 
 def consumer():
     config = {
@@ -47,6 +53,7 @@ def is_not_cached(dict_data):
         if cached == None or cached != data_without_id:
             redis_con.hset(dict_data["alert_id"],
                 mapping=data_without_id)
+            redis_con.expire(dict_data["alert_id"], 1800)
 
             return True
 
@@ -74,11 +81,45 @@ def is_valid(dict_data):
         return True
 
 
+def get_region_with_geopandas(file_path: str, lon: float, lat: float) -> str:
+    # 1. טעינת קובץ ה-GeoJSON ל-GeoDataFrame
+    gdf = gpd.read_file(file_path)
+
+    # 2. יצירת נקודה מתאימה
+    pt = Point(lon, lat)
+
+    # 3. סינון השורות שהפוליגון שלהן מכיל את הנקודה
+    matched = gdf[gdf.geometry.contains(pt)]
+
+    # 4. החזרת שם האזור אם נמצאה התאמה, אחרת OVERSEAS
+    if not matched.empty:
+        return matched.iloc[0]["region"]
+    return "OVERSEAS"
+
+
+async def publish(dict_data, stream_name):
+    async with Producer(
+            host="localhost",
+            username="guest",
+            password="guest",
+    ) as producer:
+        await producer.create_stream(
+            stream_name, exists_ok=True, arguments={"MaxLengthBytes": STREAM_RETENTION})
+        await producer.send(stream=stream_name, message=(json.dumps(dict_data)).encode('utf-8'))
+
 def main():
+
     data_as_string=consumer()
     dict_data = json.loads(data_as_string)
-    if not is_not_cached(dict_data) and is_valid(dict_data):
-        pass
+
+    if is_not_cached(dict_data) and is_valid(dict_data):
+
+        region = get_region_with_geopandas(
+            r".\..\alert-simulator\regions.geojson",
+                    lon = dict_data["lon"],
+                    lat = dict_data["lat"])
+        asyncio.run(publish(dict_data, stream_name=region))
+        print(f"sent mesege to streem:{region.lower()}")
 
 
 if __name__ == '__main__':
