@@ -44,7 +44,7 @@ def consumer():
         # while True:m
         mesege = consumer.consume()
         mesege_content = mesege[0].value().decode('utf-8')
-        print(mesege_content)
+        
         return mesege_content
     except KeyboardInterrupt:
         pass
@@ -59,7 +59,7 @@ def is_not_cached(dict_data):
 
         if cached == None or cached != dict_data["alert_id"]:
             redis_con.set(dict_data["alert_id"], dict_data["alert_id"])
-            redis_con.expire(dict_data["alert_id"], 1800)
+            redis_con.expire(dict_data["alert_id"], 90)
 
             return True
 
@@ -135,8 +135,3 @@ if __name__ == '__main__':
     main()
 
 
-'''
-run -it --rm --name rabbitmq -p 5552:5552 -p 15672:15672 -p 5672:5672 -e RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost" rabbitmq:4-management
-
-docker exec rabbitmq rabbitmq-plugins enable rabbitmq_stream rabbitmq_stream_management
-'''

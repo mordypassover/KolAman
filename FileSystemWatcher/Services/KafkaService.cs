@@ -54,7 +54,7 @@ public class KafkaService
         {
             var mesegeString = $"[{level}], [CsFileSystemWatcher], {mesege}, {DateTime.Now}";
             producer.Produce("logs", new Message<Null, string> { Value = mesegeString });
-            Console.WriteLine("logged!");
+            Console.WriteLine($"logged mesege{mesege}");
             producer.Flush();
         }
 

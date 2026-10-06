@@ -82,7 +82,7 @@ namespace CsFileSystemWatcher.Services
             }
 
             string value = $"Created: {e.FullPath}";
-            Console.WriteLine(value);
+            
         }
 
         private static void OnDeleted(object sender, FileSystemEventArgs e) =>

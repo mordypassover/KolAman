@@ -17,7 +17,7 @@ class Program
         services.AddSingleton<IConfiguration>(configuration);
         services.AddScoped<KafkaService>();
         services.AddScoped<FileWatchingService>();
-        
+
 
 
         var providor = services.BuildServiceProvider();

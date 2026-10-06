@@ -71,7 +71,7 @@ public class RabbitService
                             }
                             catch (Exception ex)
                             {
-                                Console.WriteLine(ex);
+                                Console.WriteLine("error");
                             }
 
                         }
