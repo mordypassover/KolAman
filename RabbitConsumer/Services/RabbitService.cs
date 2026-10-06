@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
+using RabbitConsumer.Models;
 using RabbitMQ.AMQP.Client;
 using RabbitMQ.AMQP.Client.Impl;
+using System.Text.Json;
 
 
 namespace RabbitConsumer.Services;
@@ -8,9 +10,12 @@ namespace RabbitConsumer.Services;
 public class RabbitService
 {
     private readonly IConfiguration _configuration;
-    public RabbitService(IConfiguration configuration)
+    private readonly DbManeger _dbManeger;
+
+    public RabbitService(IConfiguration configuration, DbManeger dbManeger)
     {
         _configuration = configuration;
+        _dbManeger = dbManeger;
     }
     public async Task Run()
     {
@@ -50,14 +55,30 @@ public class RabbitService
             {
                 IConsumer consumer = await connection.ConsumerBuilder()
                     .Queue(queue)
-                    .MessageHandler((ctx, message) =>
+                    .MessageHandler(async (ctx, message) =>
                     {
-                        Console.WriteLine(
-                            $"[{queue}] Received: {message.BodyAsString()}");
+                        var messegeObj = JsonSerializer.Deserialize<IncommingMesege>(message.BodyAsString());
+                        if (messegeObj == null)
+                        {
+                            Console.WriteLine("messege not deserialiseble");
+                        }
+                        else
+                        {
+                            Console.WriteLine( $"[{queue}] Received: {messegeObj.AlertId}");
+                            try
+                            {
+                                await _dbManeger.Store(messegeObj, queue);
+                            }
+                            catch (Exception ex)
+                            {
+                                Console.WriteLine(ex);
+                            }
 
+                        }
+                        
                         ctx.Accept();
 
-                        return Task.CompletedTask;
+                        return; 
                     })
                     .BuildAndStartAsync();
 

@@ -26,5 +26,12 @@ services:
     ports:
       - "6379:6379"
   
-
-
+  db:
+    image: mysql:8.0
+    container_name: mysql
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: kol-aman
+    ports:
+      - "3306:3306"
+    
