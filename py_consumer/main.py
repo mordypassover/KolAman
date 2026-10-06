@@ -6,6 +6,7 @@ import asyncio
 from rstream import Producer
 from confluent_kafka import Consumer as KafkaConsumer ,Producer as KafkaProducer
 import datetime
+import pika
 
 import logging
 # 5GB
@@ -29,7 +30,7 @@ def kafka_logger(mesege, level):
 def consumer():
     config = {
         'bootstrap.servers': 'localhost:9092',
-        'group.id': 'kafka-python',
+        'group.id': 'kafka-python1',
         'auto.offset.reset': 'earliest'
     }
 
@@ -103,14 +104,14 @@ def get_region_with_geopandas(file_path: str, lon: float, lat: float) -> str:
 
 
 async def publish(dict_data, stream_name):
-    async with Producer(
-            host="localhost",
-            username="guest",
-            password="guest",
-    ) as producer:
-        await producer.create_stream(
-            stream_name, exists_ok=True, arguments={"MaxLengthBytes": STREAM_RETENTION})
-        await producer.send(stream=stream_name, message=(json.dumps(dict_data)).encode('utf-8'))
+    connection = pika.BlockingConnection(pika.ConnectionParameters('localhost'))
+    channel = connection.channel()
+    channel.queue_declare(queue=stream_name, durable=True, arguments={'x-queue-type': 'quorum'})
+    channel.basic_publish(exchange='',
+                          routing_key=stream_name,
+                          body=(json.dumps(dict_data)).encode('utf-8'))
+    connection.close()
+
 def main():
     while True:
         data_as_string=consumer()
