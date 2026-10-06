@@ -4,10 +4,26 @@ import geopandas as gpd
 from shapely.geometry import Point
 import asyncio
 from rstream import Producer
-from confluent_kafka import Consumer
+from confluent_kafka import Consumer as KafkaConsumer ,Producer as KafkaProducer
+import datetime
 
+import logging
 # 5GB
 STREAM_RETENTION = 5000000000
+
+
+
+def kafka_logger(mesege, level):
+    config = {
+        'bootstrap.servers': 'localhost:9092'
+    }
+    producer = KafkaProducer(config)
+
+    topic = "logs"
+
+    producer.produce(topic, f"[{level}], [{__name__}], {mesege}, {datetime.datetime.now}")
+
+    producer.flush()
 
 
 def consumer():
@@ -18,7 +34,7 @@ def consumer():
     }
 
     # Create Consumer instance
-    consumer = Consumer(config)
+    consumer = KafkaConsumer(config)
 
     # Subscribe to topic
     topic = "raw-data"
@@ -38,21 +54,10 @@ def consumer():
 def is_not_cached(dict_data):
     redis_con = redis.Redis(host='localhost', port=6379, decode_responses=True)
     try:
-        cached =redis_con.hgetall(dict_data["alert_id"])
-        data_without_id = {
-                "source":dict_data["source"],
-                "title":dict_data["title"],
-                "content":dict_data["content"],
-                "priority":dict_data["priority"],
-                "classification":dict_data["classification"],
-                "lat":dict_data["lat"],
-                "lon":dict_data["lon"],
-                "timestamp":dict_data["timestamp"],
-                "status":dict_data["status"]
-                }
-        if cached == None or cached != data_without_id:
-            redis_con.hset(dict_data["alert_id"],
-                mapping=data_without_id)
+        cached = redis_con.get(dict_data["alert_id"])
+
+        if cached == None or cached != dict_data["alert_id"]:
+            redis_con.set(dict_data["alert_id"], dict_data["alert_id"])
             redis_con.expire(dict_data["alert_id"], 1800)
 
             return True
@@ -106,21 +111,31 @@ async def publish(dict_data, stream_name):
         await producer.create_stream(
             stream_name, exists_ok=True, arguments={"MaxLengthBytes": STREAM_RETENTION})
         await producer.send(stream=stream_name, message=(json.dumps(dict_data)).encode('utf-8'))
-
 def main():
+    while True:
+        data_as_string=consumer()
+        dict_data = json.loads(data_as_string)
 
-    data_as_string=consumer()
-    dict_data = json.loads(data_as_string)
+        if is_not_cached(dict_data) and is_valid(dict_data):
 
-    if is_not_cached(dict_data) and is_valid(dict_data):
-
-        region = get_region_with_geopandas(
-            r".\..\alert-simulator\regions.geojson",
-                    lon = dict_data["lon"],
-                    lat = dict_data["lat"])
-        asyncio.run(publish(dict_data, stream_name=region))
-        print(f"sent mesege to streem:{region.lower()}")
+            region = get_region_with_geopandas(
+                r".\..\alert-simulator\regions.geojson",
+                        lon = float(dict_data["lon"]),
+                        lat = float(dict_data["lat"]))
+            try:
+                print(f"sending to {region}")
+                asyncio.run(publish(dict_data, stream_name=region))
+                kafka_logger("INFO", f"mesege sent to {region}")
+            except Exception as e:
+                print(e)
 
 
 if __name__ == '__main__':
     main()
+
+
+'''
+run -it --rm --name rabbitmq -p 5552:5552 -p 15672:15672 -p 5672:5672 -e RABBITMQ_SERVER_ADDITIONAL_ERL_ARGS="-rabbitmq_stream advertised_host localhost" rabbitmq:4-management
+
+docker exec rabbitmq rabbitmq-plugins enable rabbitmq_stream rabbitmq_stream_management
+'''

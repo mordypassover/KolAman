@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -12,18 +13,19 @@ namespace CsFileSystemWatcher.Services;
 
 public class KafkaService
 {
-    private readonly string _bootStrap;
+    private readonly IConfiguration _configuration;
 
-    public KafkaService(string bootStrap)
+
+    public KafkaService(IConfiguration configuration)
     {
-        _bootStrap = bootStrap;
+        _configuration = configuration;
     }
 
     public void Produce(string topic, RawMesege mesege)
     {
         var config = new ProducerConfig
         {
-            BootstrapServers = _bootStrap
+            BootstrapServers = _configuration["Kafka:BootstrapServers"]
         };
 
         using (var producer = new ProducerBuilder<Null, string>(config).Build())
@@ -39,5 +41,23 @@ public class KafkaService
 
             producer.Flush(TimeSpan.FromSeconds(10));
         }
+       
+    }
+    public void Log(string level, string mesege)
+    {
+        var config = new ProducerConfig
+        {
+            BootstrapServers = _configuration["Kafka:BootstrapServers"]
+        };
+
+        using (var producer = new ProducerBuilder<Null, string>(config).Build())
+        {
+            var mesegeString = $"[{level}], [CsFileSystemWatcher], {mesege}, {DateTime.Now}";
+            producer.Produce("logs", new Message<Null, string> { Value = mesegeString });
+            Console.WriteLine("logged!");
+            producer.Flush();
+        }
+
+
     }
 }

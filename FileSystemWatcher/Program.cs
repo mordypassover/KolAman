@@ -13,15 +13,27 @@ class Program
             .AddJsonFile("Appsettings.json")
             .Build();
 
-        //var services = new ServiceCollection();
+        var services = new ServiceCollection();
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddScoped<KafkaService>();
+        services.AddScoped<FileWatchingService>();
+        
 
 
+        var providor = services.BuildServiceProvider();
 
-        var kafkaService = new KafkaService(configuration["Kafka:BootstrapServers"]!);
-        //services.AddScoped<KafkaService>();
+        using (var scope = providor.CreateScope())
+        {
+            var watcher = scope.ServiceProvider.GetRequiredService<FileWatchingService>();
+            try
+            {
+                watcher.Watch();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
 
-        var watcher = new FileWatchingService(kafkaService);
-
-        watcher.Watch();
     }
 }

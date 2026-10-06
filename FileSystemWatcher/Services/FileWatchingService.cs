@@ -9,10 +9,12 @@ namespace CsFileSystemWatcher.Services
     class FileWatchingService
     {
         private readonly KafkaService _producer;
+        
 
         public FileWatchingService(KafkaService producer)
         {
             _producer = producer;
+
         }
         public void Watch()
         {
@@ -47,29 +49,6 @@ namespace CsFileSystemWatcher.Services
         {
             if (e.ChangeType != WatcherChangeTypes.Changed)
             {
-                if (e.FullPath.Split('\\').Last() == "alert.ready")
-                {
-                    var filePath = e.FullPath.Split('\\');
-                    filePath[filePath.Length-1] = "alert.json";
-                    Console.WriteLine();
-
-                    var mesegeString = File.ReadAllText(string.Join("\\", filePath));
-                    try
-                    {
-                        var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
-                        if (rawMesege == null)
-                        {
-                            return;
-                        }
-
-                        _producer.Produce("raw-data", rawMesege);
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine(ex);
-                    }
-                }
-
                 return;
             }
             Console.WriteLine($"Changed: {e.FullPath}");
@@ -89,14 +68,16 @@ namespace CsFileSystemWatcher.Services
                     var rawMesege = JsonSerializer.Deserialize<RawMesege>(mesegeString);
                     if (rawMesege == null)
                     {
+                        _producer.Log("ERROR", $"failed to Serialise mesege");
                         return;
                     }
 
                     _producer.Produce("raw-data", rawMesege);
+                    _producer.Log("INFO", $"sent mesege {rawMesege.AlertId} to topic raw-data");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine(ex);
+                    _producer.Log("WORNING", $"failed to send mesege");
                 }
             }
 
